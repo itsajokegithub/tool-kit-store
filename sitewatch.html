@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <title>SiteWatch - 网站监控</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-hover: #263347;
+            --border: #334155;
+            --fg: #f1f5f9;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --green: #4ade80;
+            --red: #f87171;
+            --yellow: #fbbf24;
+            --orange: #fb923c;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            padding: 16px 16px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 100;
+        }
+
+        .header-left h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .header-left h1 span {
+            color: var(--accent);
+        }
+
+        .header-left p {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 18px;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.92);
+            background: var(--card-hover);
+        }
+
+        .icon-btn.active {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 12px 16px;
+        }
+
+        .stat-item {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 10px 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .stat-value.green { color: var(--green); }
+        .stat-value.red { color: var(--red); }
+        .stat-value.yellow { color: var(--yellow); }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* Site List */
+        .site-list {
+            padding: 0 16px 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .site-card {
+            background: var(--card);
+            border-radius: 14px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .site-card.testing {
+            border-color: var(--yellow);
+            box-shadow: 0 0 0 1px var(--yellow), 0 0 20px rgba(251, 191, 36, 0.1);
+        }
+
+        .site-card.online { border-left: 3px solid var(--green); }
+        .site-card.offline { border-left: 3px solid var(--red); }
+        .site-card.unknown { border-left: 3px solid var(--muted); }
+
+        .site-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .site-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .status-dot.online {
+            background: var(--green);
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+        }
+
+        .status-dot.offline {
+            background: var(--red);
+            box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+        }
+
+        .status-dot.unknown { background: var(--muted); }
+
+        .status-dot.testing {
+            background: var(--yellow);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .site-name {
+            font-size: 15px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .site-url {
+            font-size: 11px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .site-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .site-actions .icon-btn {
+            width: 30px;
+            height: 30px;
+            font-size: 14px;
+            border-radius: 8px;
+        }
+
+        .site-actions .icon-btn.delete:hover {
+            color: var(--red);
+            border-color: var(--red);
+        }
+
+        .site-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .meta-tag {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .meta-tag .value {
+            color: var(--fg);
+            font-weight: 500;
+        }
+
+        .meta-tag.fast .value { color: var(--green); }
+        .meta-tag.slow .value { color: var(--yellow); }
+        .meta-tag.fail .value { color: var(--red); }
+
+        /* History dots */
+        .history-bar {
+            display: flex;
+            gap: 3px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .history-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+            opacity: 0.4;
+            transition: all 0.2s;
+        }
+
+        .history-dot.up { background: var(--green); opacity: 1; }
+        .history-dot.down { background: var(--red); opacity: 1; }
+        .history-dot.slow { background: var(--yellow); opacity: 1; }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: calc(24px + var(--safe-bottom));
+            right: 20px;
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(56, 189, 248, 0.4);
+            transition: all 0.2s;
+            z-index: 90;
+        }
+
+        .fab:active {
+            transform: scale(0.9);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 200;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            padding: var(--safe-bottom) 16px 16px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal {
+            background: var(--card);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--fg);
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .form-group input::placeholder {
+            color: #475569;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #0f172a;
+        }
+
+        .btn-secondary {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--muted);
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 150;
+            display: none;
+            flex-direction: column;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        .settings-panel.show {
+            display: flex;
+        }
+
+        .settings-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+            padding-top: calc(16px + var(--safe-top));
+        }
+
+        .settings-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .settings-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .setting-group {
+            background: var(--card);
+            border-radius: 14px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+
+        .setting-group h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--fg);
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .setting-item + .setting-item {
+            border-top: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .setting-select {
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--fg);
+            font-size: 13px;
+        }
+
+        .setting-desc {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .btn-danger {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            background: rgba(248, 113, 113, 0.1);
+            color: var(--red);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-danger:active { transform: scale(0.97); }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: calc(16px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: calc(100% - 32px);
+            max-width: 400px;
+            pointer-events: none;
+        }
+
+        .toast {
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in forwards;
+            animation-delay: 0s, 2.7s;
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+        }
+
+        .toast.success { border-color: var(--green); color: var(--green); }
+        .toast.error { border-color: var(--red); color: var(--red); }
+        .toast.info { border-color: var(--accent); color: var(--accent); }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* Uptime bar */
+        .uptime-bar {
+            display: flex;
+            height: 20px;
+            border-radius: 6px;
+            overflow: hidden;
+            gap: 1px;
+            margin-top: 8px;
+        }
+
+        .uptime-segment {
+            flex: 1;
+            border-radius: 2px;
+            transition: background 0.3s;
+        }
+
+        .uptime-segment.up { background: var(--green); }
+        .uptime-segment.down { background: var(--red); }
+        .uptime-segment.empty { background: rgba(51, 65, 85, 0.5); }
+
+        /* Confirm dialog */
+        .confirm-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 250;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .confirm-overlay.show { display: flex; }
+
+        .confirm-box {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 320px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .confirm-box p {
+            font-size: 15px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-left">
+        <h1><span>Site</span>Watch</h1>
+        <p id="lastCheckTime">等待检测...</p>
+    </div>
+    <div class="header-actions">
+        <button class="icon-btn" id="btnTestAll" title="全部检测">&#x21bb;</button>
+        <button class="icon-btn" id="btnSettings" title="设置">&#9881;</button>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+    <div class="stat-item">
+        <div class="stat-value green" id="statOnline">0</div>
+        <div class="stat-label">正常</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value red" id="statOffline">0</div>
+        <div class="stat-label">故障</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value yellow" id="statPending">0</div>
+        <div class="stat-label">待检</div>
+    </div>
+</div>
+
+<!-- Site List -->
+<div class="site-list" id="siteList"></div>
+
+<!-- Empty State -->
+<div class="empty-state" id="emptyState" style="display:none;">
+    <div class="icon">&#128270;</div>
+    <p>还没有监控站点<br>点击下方按钮添加一个</p>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="btnAdd">+</button>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <h2>添加监控站点</h2>
+        <div class="form-group">
+            <label>站点名称</label>
+            <input type="text" id="inputName" placeholder="例如：公司官网" maxlength="30">
+        </div>
+        <div class="form-group">
+            <label>网站地址</label>
+            <input type="url" id="inputUrl" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+            <label>检测间隔（全局）</label>
+            <select id="inputInterval">
+                <option value="30">30 秒</option>
+                <option value="60" selected>1 分钟</option>
+                <option value="300">5 分钟</option>
+                <option value="900">15 分钟</option>
+                <option value="1800">30 分钟</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-secondary" id="btnCancelAdd">取消</button>
+            <button class="btn btn-primary" id="btnConfirmAdd">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-panel" id="settingsPanel">
+    <div class="settings-header">
+        <button class="icon-btn" id="btnCloseSettings">&#8592;</button>
+        <h2>设置</h2>
+    </div>
+    <div class="settings-body">
+        <div class="setting-group">
+            <h3>全局检测间隔</h3>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">轮询周期</div>
+                    <div class="setting-desc">自动检测所有站点的时间间隔</div>
+                </div>
+                <select class="setting-select" id="settingInterval">
+                    <option value="30">30秒</option>
+                    <option value="60">1分钟</option>
+                    <option value="300" selected>5分钟</option>
+                    <option value="900">15分钟</option>
+                    <option value="1800">30分钟</option>
+                </select>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h3>通知</h3>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">故障提醒</div>
+                    <div class="setting-desc">站点离线时推送通知</div>
+                </div>
+                <label style="position:relative;display:inline-block;width:48px;height:28px;">
+                    <input type="checkbox" id="settingNotify" style="opacity:0;width:0;height:0;">
+                    <span style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:14px;transition:.3s;"></span>
+                </label>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h3>数据</h3>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">历史记录数</div>
+                    <div class="setting-desc">每个站点保留的检测记录条数</div>
+                </div>
+                <select class="setting-select" id="settingHistory">
+                    <option value="20">20条</option>
+                    <option value="50" selected>50条</option>
+                    <option value="100">100条</option>
+                </select>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h3>危险操作</h3>
+            <button class="btn-danger" id="btnClearHistory">清除所有历史记录</button>
+            <div style="height:10px;"></div>
+            <button class="btn-danger" id="btnResetAll">重置全部数据</button>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmDialog">
+    <div class="confirm-box">
+        <p id="confirmText"></p>
+        <div class="confirm-actions">
+            <button class="btn btn-secondary" id="btnConfirmNo">取消</button>
+            <button class="btn btn-primary" id="btnConfirmYes" style="background:var(--red);color:#fff;">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============ Data Store ============
+const STORE_KEY = 'sitewatch_data';
+const SETTINGS_KEY = 'sitewatch_settings';
+
+const defaultSettings = {
+    interval: 300,        // seconds
+    notify: false,
+    maxHistory: 50
+};
+
+let sites = [];
+let settings = { ...defaultSettings };
+let timerId = null;
+let confirmCallback = null;
+
+function loadData() {
+    try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) sites = JSON.parse(raw);
+        const sRaw = localStorage.getItem(SETTINGS_KEY);
+        if (sRaw) settings = { ...defaultSettings, ...JSON.parse(sRaw) };
+    } catch (e) {
+        console.error('Load data failed:', e);
+    }
+}
+
+function saveData() {
+    localStorage.setItem(STORE_KEY, JSON.stringify(sites));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// ============ Core: Site Check ============
+async function checkSite(site) {
+    const start = performance.now();
+    const result = { time: Date.now(), status: 'offline', latency: null, error: null };
+
+    try {
+        // Use no-cors for basic connectivity; fetch with a timeout
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        const resp = await fetch(site.url, {
+            method: 'HEAD',
+            mode: 'no-cors',
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        const elapsed = Math.round(performance.now() - start);
+        // no-cors always returns opaque response (type 'opaque', status 0)
+        // If fetch doesn't throw, the server responded (even if opaque)
+        result.status = 'online';
+        result.latency = elapsed;
+    } catch (e) {
+        const elapsed = Math.round(performance.now() - start);
+        result.latency = elapsed;
+        result.error = e.name === 'AbortError' ? '连接超时' : '无法连接';
+        result.status = 'offline';
+    }
+
+    return result;
+}
+
+// ============ Timer ============
+function startTimer() {
+    stopTimer();
+    if (sites.length === 0) return;
+
+    timerId = setInterval(testAll, settings.interval * 1000);
+}
+
+function stopTimer() {
+    if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+    }
+}
+
+function restartTimer() {
+    startTimer();
+}
+
+// ============ Actions ============
+async function testAll() {
+    if (sites.length === 0) return;
+
+    const promises = sites.map(async (site) => {
+        site.status = 'testing';
+        renderSiteCard(site);
+    });
+
+    await Promise.all(promises);
+    renderStats();
+
+    const results = await Promise.all(sites.map(async (site) => {
+        const result = await checkSite(site);
+        site.status = result.status;
+        site.lastLatency = result.latency;
+        site.lastError = result.error;
+        site.lastCheck = result.time;
+
+        if (!site.history) site.history = [];
+        site.history.push(result);
+        if (site.history.length > settings.maxHistory) {
+            site.history = site.history.slice(-settings.maxHistory);
+        }
+
+        // Notification for status change
+        if (settings.notify && result.status === 'offline' && site.prevStatus === 'online') {
+            sendNotification(site);
+        }
+
+        site.prevStatus = result.status;
+        return result;
+    }));
+
+    saveData();
+    renderAll();
+
+    const now = new Date();
+    document.getElementById('lastCheckTime').textContent =
+        `上次检测: ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+}
+
+async function testSingle(id) {
+    const site = sites.find(s => s.id === id);
+    if (!site) return;
+
+    site.status = 'testing';
+    renderSiteCard(site);
+    renderStats();
+
+    const result = await checkSite(site);
+    site.status = result.status;
+    site.lastLatency = result.latency;
+    site.lastError = result.error;
+    site.lastCheck = result.time;
+
+    if (!site.history) site.history = [];
+    site.history.push(result);
+    if (site.history.length > settings.maxHistory) {
+        site.history = site.history.slice(-settings.maxHistory);
+    }
+
+    if (settings.notify && result.status === 'offline' && site.prevStatus === 'online') {
+        sendNotification(site);
+    }
+    site.prevStatus = result.status;
+
+    saveData();
+    renderAll();
+}
+
+function addSite(name, url) {
+    // Normalize URL
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+
+    const site = {
+        id: genId(),
+        name: name.trim(),
+        url: url,
+        status: 'unknown',
+        lastLatency: null,
+        lastError: null,
+        lastCheck: null,
+        prevStatus: null,
+        history: [],
+        createdAt: Date.now()
+    };
+
+    sites.push(site);
+    saveData();
+    renderAll();
+    startTimer();
+
+    // Auto-test the new site
+    setTimeout(() => testSingle(site.id), 300);
+
+    showToast(`已添加: ${site.name}`, 'success');
+}
+
+function removeSite(id) {
+    const site = sites.find(s => s.id === id);
+    if (!site) return;
+    sites = sites.filter(s => s.id !== id);
+    saveData();
+    renderAll();
+    if (sites.length === 0) stopTimer();
+    showToast(`已移除: ${site.name}`, 'info');
+}
+
+// ============ Notification ============
+function sendNotification(site) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        new Notification('SiteWatch 告警', {
+            body: `${site.name} 似乎离线了！\n${site.url}`,
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">🔴</text></svg>'
+        });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(perm => {
+            if (perm === 'granted') sendNotification(site);
+        });
+    }
+}
+
+// ============ Rendering ============
+function renderAll() {
+    renderStats();
+    renderSiteList();
+}
+
+function renderStats() {
+    const online = sites.filter(s => s.status === 'online').length;
+    const offline = sites.filter(s => s.status === 'offline').length;
+    const pending = sites.filter(s => s.status === 'unknown' || s.status === 'testing').length;
+
+    document.getElementById('statOnline').textContent = online;
+    document.getElementById('statOffline').textContent = offline;
+    document.getElementById('statPending').textContent = pending;
+}
+
+function renderSiteList() {
+    const list = document.getElementById('siteList');
+    const empty = document.getElementById('emptyState');
+
+    if (sites.length === 0) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+
+    empty.style.display = 'none';
+    list.innerHTML = sites.map(site => renderSiteCardHTML(site)).join('');
+}
+
+function renderSiteCardHTML(site) {
+    const statusClass = site.status === 'testing' ? 'testing' :
+                        site.status === 'online' ? 'online' :
+                        site.status === 'offline' ? 'offline' : 'unknown';
+
+    const latencyText = site.lastLatency !== null ? `${site.lastLatency}ms` : '--';
+    const latencyClass = site.lastLatency === null ? '' :
+                         site.lastLatency < 500 ? 'fast' :
+                         site.lastLatency < 2000 ? 'slow' : 'fail';
+
+    const errorText = site.lastError || '';
+    const checkTime = site.lastCheck ? new Date(site.lastCheck) : null;
+    const timeStr = checkTime ?
+        `${checkTime.getHours().toString().padStart(2,'0')}:${checkTime.getMinutes().toString().padStart(2,'0')}` : '--';
+
+    // Calculate uptime from history
+    const history = site.history || [];
+    const total = history.length;
+    const up = history.filter(h => h.status === 'online').length;
+    const uptimePct = total > 0 ? Math.round(up / total * 100) : 0;
+
+    // History dots (last 24)
+    const recentHistory = history.slice(-24);
+    const dotsHTML = recentHistory.map(h => {
+        const cls = h.status === 'online' ? (h.latency > 2000 ? 'slow' : 'up') : 'down';
+        return `<div class="history-dot ${cls}" title="${h.latency !== null ? h.latency + 'ms' : 'fail'}"></div>`;
+    }).join('');
+
+    // Uptime bar (last 24 segments)
+    const segments = recentHistory.length > 0 ? recentHistory : [];
+    const segHTML = segments.map(h => {
+        const cls = h.status === 'online' ? 'up' : 'down';
+        return `<div class="uptime-segment ${cls}"></div>`;
+    }).join('');
+
+    return `
+        <div class="site-card ${statusClass}" data-id="${site.id}">
+            <div class="site-top">
+                <div class="site-info">
+                    <div class="status-dot ${statusClass}"></div>
+                    <div>
+                        <div class="site-name">${escapeHtml(site.name)}</div>
+                        <div class="site-url">${escapeHtml(site.url)}</div>
+                    </div>
+                </div>
+                <div class="site-actions">
+                    <button class="icon-btn" onclick="testSingle('${site.id}')" title="立即检测">&#x21bb;</button>
+                    <button class="icon-btn delete" onclick="confirmRemove('${site.id}', '${escapeHtml(site.name)}')" title="删除">&#10005;</button>
+                </div>
+            </div>
+            <div class="site-meta">
+                <div class="meta-tag ${latencyClass}">
+                    &#9201; <span class="value">${latencyText}</span>
+                </div>
+                <div class="meta-tag">
+                    &#128338; ${timeStr}
+                </div>
+                <div class="meta-tag">
+                    &#11088; ${total > 0 ? uptimePct + '%' : '--'}
+                </div>
+                ${errorText ? `<div class="meta-tag fail">${escapeHtml(errorText)}</div>` : ''}
+            </div>
+            <div class="uptime-bar">${segHTML || '<div class="uptime-segment empty" style="flex:1;"></div>'}</div>
+            <div class="history-bar">${dotsHTML}</div>
+        </div>
+    `;
+}
+
+function renderSiteCard(site) {
+    const card = document.querySelector(`.site-card[data-id="${site.id}"]`);
+    if (card) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = renderSiteCardHTML(site);
+        card.replaceWith(tmp.firstElementChild);
+    }
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ============ Toast ============
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// ============ Confirm ============
+function showConfirm(text, callback) {
+    document.getElementById('confirmText').textContent = text;
+    document.getElementById('confirmDialog').classList.add('show');
+    confirmCallback = callback;
+}
+
+function confirmRemove(id, name) {
+    showConfirm(`确定要删除「${name}」吗？`, () => removeSite(id));
+}
+
+// ============ Event Handlers ============
+document.getElementById('btnAdd').addEventListener('click', () => {
+    document.getElementById('addModal').classList.add('show');
+    document.getElementById('inputName').value = '';
+    document.getElementById('inputUrl').value = '';
+    setTimeout(() => document.getElementById('inputName').focus(), 300);
+});
+
+document.getElementById('btnCancelAdd').addEventListener('click', () => {
+    document.getElementById('addModal').classList.remove('show');
+});
+
+document.getElementById('btnConfirmAdd').addEventListener('click', () => {
+    const name = document.getElementById('inputName').value.trim();
+    const url = document.getElementById('inputUrl').value.trim();
+    if (!name) { showToast('请输入站点名称', 'error'); return; }
+    if (!url) { showToast('请输入网站地址', 'error'); return; }
+
+    // Basic URL validation
+    try {
+        if (!url.startsWith('http')) new URL('https://' + url);
+        else new URL(url);
+    } catch {
+        showToast('请输入有效的网站地址', 'error');
+        return;
+    }
+
+    addSite(name, url);
+    document.getElementById('addModal').classList.remove('show');
+});
+
+// Close modal on overlay click
+document.getElementById('addModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        document.getElementById('addModal').classList.remove('show');
+    }
+});
+
+// Enter key in modal
+document.getElementById('inputUrl').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnConfirmAdd').click();
+});
+document.getElementById('inputName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('inputUrl').focus();
+});
+
+// Test all
+document.getElementById('btnTestAll').addEventListener('click', () => {
+    if (sites.length === 0) {
+        showToast('请先添加站点', 'info');
+        return;
+    }
+    testAll();
+});
+
+// Settings
+document.getElementById('btnSettings').addEventListener('click', () => {
+    document.getElementById('settingsPanel').classList.add('show');
+    // Sync settings to UI
+    document.getElementById('settingInterval').value = settings.interval;
+    document.getElementById('settingHistory').value = settings.maxHistory;
+    document.getElementById('settingNotify').checked = settings.notify;
+    updateToggleStyle();
+});
+
+document.getElementById('btnCloseSettings').addEventListener('click', () => {
+    document.getElementById('settingsPanel').classList.remove('show');
+});
+
+document.getElementById('settingInterval').addEventListener('change', (e) => {
+    settings.interval = parseInt(e.target.value);
+    saveData();
+    restartTimer();
+    showToast(`检测间隔已设为 ${formatInterval(settings.interval)}`, 'success');
+});
+
+document.getElementById('settingHistory').addEventListener('change', (e) => {
+    settings.maxHistory = parseInt(e.target.value);
+    saveData();
+    showToast(`保留最近 ${settings.maxHistory} 条记录`, 'success');
+});
+
+document.getElementById('settingNotify').addEventListener('change', (e) => {
+    settings.notify = e.target.checked;
+    saveData();
+    if (settings.notify && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+    updateToggleStyle();
+    showToast(settings.notify ? '已开启故障提醒' : '已关闭故障提醒', 'info');
+});
+
+function updateToggleStyle() {
+    const checkbox = document.getElementById('settingNotify');
+    const track = checkbox.nextElementSibling;
+    if (checkbox.checked) {
+        track.style.background = 'var(--accent)';
+        track.innerHTML = '<span style="position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:3px;right:3px;transition:.3s;"></span>';
+    } else {
+        track.style.background = 'var(--border)';
+        track.innerHTML = '<span style="position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.3s;"></span>';
+    }
+}
+
+document.getElementById('btnClearHistory').addEventListener('click', () => {
+    showConfirm('确定清除所有历史记录吗？站点不会被删除。', () => {
+        sites.forEach(s => { s.history = []; s.prevStatus = null; });
+        saveData();
+        renderAll();
+        showToast('历史记录已清除', 'success');
+    });
+});
+
+document.getElementById('btnResetAll').addEventListener('click', () => {
+    showConfirm('确定重置全部数据吗？所有站点和历史记录都将被删除。', () => {
+        sites = [];
+        stopTimer();
+        saveData();
+        renderAll();
+        document.getElementById('lastCheckTime').textContent = '等待检测...';
+        showToast('数据已重置', 'success');
+    });
+});
+
+// Confirm dialog
+document.getElementById('btnConfirmYes').addEventListener('click', () => {
+    document.getElementById('confirmDialog').classList.remove('show');
+    if (confirmCallback) confirmCallback();
+    confirmCallback = null;
+});
+
+document.getElementById('btnConfirmNo').addEventListener('click', () => {
+    document.getElementById('confirmDialog').classList.remove('show');
+    confirmCallback = null;
+});
+
+document.getElementById('confirmDialog').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        document.getElementById('confirmDialog').classList.remove('show');
+        confirmCallback = null;
+    }
+});
+
+function formatInterval(seconds) {
+    if (seconds < 60) return `${seconds}秒`;
+    if (seconds < 3600) return `${seconds / 60}分钟`;
+    return `${seconds / 3600}小时`;
+}
+
+// ============ Init ============
+loadData();
+updateToggleStyle();
+renderAll();
+
+// Auto-start timer
+if (sites.length > 0) {
+    startTimer();
+    // Run first check immediately
+    testAll();
+}
+</script>
+
+</body>
+</html>
